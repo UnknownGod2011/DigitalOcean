@@ -7,7 +7,7 @@ services:
   - name: gradient-agent
     # Source configuration
     github:
-      repo: your-username/cursivis-gradient
+      repo: UnknownGod2011/DigitalOcean
       branch: main
       deploy_on_push: true
     
@@ -25,8 +25,14 @@ services:
       - key: GRADIENT_TEXT_MODEL
         value: anthropic-claude-4.5-haiku
         scope: RUN_TIME
+      - key: GRADIENT_VISION_MODEL
+        value: openai-gpt-4o
+        scope: RUN_TIME
       - key: GRADIENT_VOICE_MODEL
         value: openai-gpt-4o
+        scope: RUN_TIME
+      - key: GRADIENT_EMBEDDING_MODEL
+        value: gte-large-v1.5
         scope: RUN_TIME
       - key: PORT
         value: "8080"

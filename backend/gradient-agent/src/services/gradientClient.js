@@ -92,7 +92,7 @@ export async function callGradient({
   const response = await client.chat.completions.create({
     model,
     messages: builtMessages,
-    max_tokens: maxTokens,
+    max_completion_tokens: maxTokens,
     temperature
   });
 

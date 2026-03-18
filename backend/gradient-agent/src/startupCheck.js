@@ -27,7 +27,7 @@ export async function validateGradientConnection() {
     const response = await client.chat.completions.create({
       model: TEXT_MODEL_ID,
       messages: [{ role: "user", content: "Reply with the single word: ready" }],
-      max_tokens: 8,
+      max_completion_tokens: 8,
       temperature: 0.0
     });
     const text = response.choices[0]?.message?.content?.trim() ?? "(empty)";
