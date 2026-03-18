@@ -247,7 +247,7 @@ export function isSevereActionConflict(action, contentType) {
   const normalizedType = normalizeContentType(contentType);
   const normalizedAction = normalizeActionHint(action);
   if (!KNOWN_ACTIONS.has(normalizedAction)) {
-    // Allow novel Nova-proposed actions to flow through unless explicitly unsafe elsewhere.
+    // Allow novel model-proposed actions to flow through unless explicitly unsafe elsewhere.
     return false;
   }
 

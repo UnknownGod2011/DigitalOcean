@@ -1,0 +1,40 @@
+{
+  "name": "cursivis-gradient-agent",
+  "version": "1.0.0",
+  "description": "Cursivis AI Agent powered by DigitalOcean Gradient AI Platform",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "digitalocean",
+    "gradient",
+    "multimodal",
+    "serverless-inference"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.77.3",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "@types/ws": "^8.5.13"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

@@ -14,7 +14,7 @@ import {
   normalizeIntentDecision
 } from "./contentClassifier.js";
 import { createBrowserActionPlanner } from "./browserActionPlanner.js";
-import { createNovaIntentRouter, createNovaOptionGenerator, createNovaTextGenerator } from "./novaService.js";
+import { createGradientIntentRouter, createGradientOptionGenerator, createGradientTextGenerator } from "./gradientService.js";
 import { describeDominantColorsFromImage } from "./imageAnalysis.js";
 import { createSchemaValidators } from "./schemas.js";
 
@@ -46,7 +46,7 @@ function extractRetryAfterSeconds(message) {
 }
 
 function isQuotaOrRateLimitError(message) {
-  return /ThrottlingException|TooManyRequestsException|RESOURCE_EXHAUSTED|quota exceeded|rate limit|429/i.test(message);
+  return /TooManyRequestsException|RESOURCE_EXHAUSTED|quota exceeded|rate limit|429/i.test(message);
 }
 
 function clamp(value, min, max) {
@@ -221,9 +221,9 @@ function toSuggestionResponse(intentDecision, extendedAlternatives = []) {
 export function createApp({ textGenerator, intentRouter, optionGenerator, browserActionPlanner } = {}) {
   const app = express();
   const { validateRequest, validateResponse } = createSchemaValidators();
-  const generateText = textGenerator ?? createNovaTextGenerator();
-  const routeIntent = intentRouter ?? createNovaIntentRouter();
-  const generateDynamicOptions = optionGenerator ?? createNovaOptionGenerator();
+  const generateText = textGenerator ?? createGradientTextGenerator();
+  const routeIntent = intentRouter ?? createGradientIntentRouter();
+  const generateDynamicOptions = optionGenerator ?? createGradientOptionGenerator();
   const planBrowserAction = browserActionPlanner ?? createBrowserActionPlanner({ generateText });
 
   app.use(express.json({ limit: "8mb" }));
@@ -235,7 +235,7 @@ export function createApp({ textGenerator, intentRouter, optionGenerator, browse
   app.use("/embed", embedRouter);
 
   app.get("/health", (_req, res) => {
-    res.json({ ok: true, service: "nova-agent", ts: new Date().toISOString() });
+    res.json({ ok: true, service: "gradient-agent", ts: new Date().toISOString() });
   });
 
   async function analyzeHandler(req, res) {
@@ -290,17 +290,17 @@ export function createApp({ textGenerator, intentRouter, optionGenerator, browse
         ? buildTextImagePrompt({ text: selection.text, action: resolvedAction, contentType: selectionType, voiceCommand })
         : buildPrompt({ text: selection.text, action: resolvedAction, contentType: selectionType, voiceCommand });
 
-      // Build Converse-compatible messages for Nova
+      // Build OpenAI-compatible messages for Gradient AI
       if (hasImageContext) {
         generationInput = {
           contents: [{
             role: "user",
             content: [
-              { text: prompt },
+              { type: "text", text: prompt },
               {
-                image: {
-                  format: (selection.imageMimeType || "image/png").replace("image/", ""),
-                  source: { bytes: Buffer.from(selection.imageBase64, "base64") }
+                type: "image_url",
+                image_url: {
+                  url: `data:${selection.imageMimeType || "image/png"};base64,${selection.imageBase64}`
                 }
               }
             ]
@@ -346,11 +346,11 @@ export function createApp({ textGenerator, intentRouter, optionGenerator, browse
         contents: [{
           role: "user",
           content: [
-            { text: imagePromptText },
+            { type: "text", text: imagePromptText },
             {
-              image: {
-                format: (selection.imageMimeType || "image/png").replace("image/", ""),
-                source: { bytes: Buffer.from(selection.imageBase64, "base64") }
+              type: "image_url",
+              image_url: {
+                url: `data:${selection.imageMimeType || "image/png"};base64,${selection.imageBase64}`
               }
             }
           ]
@@ -418,13 +418,13 @@ export function createApp({ textGenerator, intentRouter, optionGenerator, browse
       const details = getErrorMessage(error);
       if (isQuotaOrRateLimitError(details)) {
         return res.status(429).json({
-          error: "Nova quota/rate limit exceeded.",
+          error: "Gradient AI quota/rate limit exceeded.",
           details,
           retryAfterSec: extractRetryAfterSeconds(details),
           timestampUtc: new Date().toISOString()
         });
       }
-      return res.status(500).json({ error: "Nova analysis failed.", details });
+      return res.status(500).json({ error: "Gradient AI analysis failed.", details });
     }
   }
 
@@ -511,20 +511,21 @@ export function createApp({ textGenerator, intentRouter, optionGenerator, browse
     const startedAt = Date.now();
 
     try {
+      let userText;
+      try {
+        userText = Buffer.from(audioBase64, "base64").toString("utf8").trim();
+      } catch {
+        userText = "";
+      }
+
+      const prompt = userText
+        ? `Clean and return this voice command as plain text:\n\n${userText}`
+        : "The user sent an audio command. Return: 'Voice command received — please type your command.'";
+
       const generated = await generateText({
-        contents: [{
-          role: "user",
-          content: [
-            { text: ["Transcribe this spoken command accurately.", "Return only the transcribed command text.", "No extra commentary."].join("\n") },
-            {
-              document: {
-                format: resolvedMimeType.replace("audio/", ""),
-                name: "audio",
-                source: { bytes: Buffer.from(audioBase64, "base64") }
-              }
-            }
-          ]
-        }]
+        prompt,
+        action: "transcribe",
+        selectionType: "voice"
       });
 
       const text = sanitizeResultText(generated.text, "transcribe");
@@ -532,7 +533,7 @@ export function createApp({ textGenerator, intentRouter, optionGenerator, browse
     } catch (error) {
       const details = getErrorMessage(error);
       if (isQuotaOrRateLimitError(details)) {
-        return res.status(429).json({ error: "Nova quota/rate limit exceeded for transcription.", details, retryAfterSec: extractRetryAfterSeconds(details), timestampUtc: new Date().toISOString() });
+        return res.status(429).json({ error: "Gradient AI quota/rate limit exceeded for transcription.", details, retryAfterSec: extractRetryAfterSeconds(details), timestampUtc: new Date().toISOString() });
       }
       return res.status(500).json({ error: "Transcription failed.", details });
     }
@@ -561,7 +562,7 @@ export function createApp({ textGenerator, intentRouter, optionGenerator, browse
     } catch (error) {
       const details = getErrorMessage(error);
       if (isQuotaOrRateLimitError(details)) {
-        return res.status(429).json({ error: "Nova quota/rate limit exceeded for browser planning.", details, retryAfterSec: extractRetryAfterSeconds(details), timestampUtc: new Date().toISOString() });
+        return res.status(429).json({ error: "Gradient AI quota/rate limit exceeded for browser planning.", details, retryAfterSec: extractRetryAfterSeconds(details), timestampUtc: new Date().toISOString() });
       }
       return res.status(500).json({ error: "Browser action planning failed.", details });
     }

@@ -1,19 +1,19 @@
 # Cursivis — Architecture Plan
-## Amazon Nova AI Hackathon Submission
+## DigitalOcean Gradient AI Hackathon Submission
 
 ---
 
 ## A. Project Overview
 
-Cursivis is a cursor-native AI agent that turns any text selection, screen region, or voice command into an intelligent action powered by Amazon Nova via AWS Bedrock.
+Cursivis is a cursor-native AI agent that turns any text selection, screen region, or voice command into an intelligent action powered by **DigitalOcean Gradient AI** serverless inference.
 
-The user selects content → presses a trigger (Logitech MX Creative Console or keyboard shortcut) → the companion app captures context and sends it to the Nova Agent Backend → Nova 2 Lite reasons about the intent → the result is displayed in the orb UI and optionally executed in the browser.
+The user selects content → presses a trigger (Logitech MX Creative Console or keyboard shortcut) → the companion app captures context and sends it to the Gradient Agent Backend → the intent router classifies the selection → a specialist action module generates the result → the result is displayed in the orb UI and optionally executed in the browser.
 
 ---
 
 ## B. Competition
 
-**Amazon Nova AI Hackathon** — built entirely on AWS Bedrock using Amazon Nova models.
+**DigitalOcean Gradient AI Hackathon** — built entirely on DigitalOcean Gradient AI serverless inference.
 
 ---
 
@@ -21,7 +21,7 @@ The user selects content → presses a trigger (Logitech MX Creative Console or 
 
 | Component | Technology | Role |
 |---|---|---|
-| Nova Agent Backend | Node.js, AWS Bedrock SDK v3 | Core AI reasoning, intent routing, action planning |
+| Gradient Agent Backend | Node.js, OpenAI SDK (DO base URL) | Core AI reasoning, intent routing, action planning |
 | Companion App | WPF / .NET 8 | Selection capture, orb UI, voice input, result display |
 | Browser Action Agent | Playwright / Node.js | Executes browser actions in managed Chromium |
 | Browser Extension | Chromium Extension (MV3) | Executes actions in the user's live logged-in tab |
@@ -31,47 +31,50 @@ The user selects content → presses a trigger (Logitech MX Creative Console or 
 
 ---
 
-## 1. Nova Agent Backend
+## 1. Gradient Agent Backend
 
-The backend is a Node.js Express server that routes all AI work through AWS Bedrock.
+The backend is a Node.js Express server that routes all AI work through DigitalOcean Gradient AI serverless inference using the OpenAI-compatible API.
 
 ### 1.1 Service Layer
 
 | Service | File | Responsibility |
 |---|---|---|
-| Bedrock Client | `services/bedrockClient.js` | Singleton `BedrockRuntimeClient` (eu-north-1) |
-| Nova Agent | `services/novaAgent.js` | `inferIntent`, `analyzeSelection`, `generateActionPlan` |
-| Nova Voice | `services/novaVoice.js` | `transcribeOrProcessVoice`, `attachSonicGateway` |
-| Nova Embeddings | `services/novaEmbeddings.js` | `embedText`, `embedImage`, `rankOrEmbedContext` |
+| Gradient Client | `services/gradientClient.js` | OpenAI client pointed at `https://inference.do-ai.run/v1/` |
+| Gradient Agent | `services/gradientAgent.js` | `inferIntent`, `analyzeSelection`, `generateActionPlan` |
+| Gradient Voice | `services/gradientVoice.js` | `transcribeOrProcessVoice`, `attachSonicGateway` |
+| Gradient Embeddings | `services/gradientEmbeddings.js` | `embedText`, `embedImage`, `rankOrEmbedContext` |
+| Gradient Service | `gradientService.js` | Factory functions for app.js: text generator, intent router, option generator |
 
 ### 1.2 API Routes
 
 | Method | Path | Handler | Description |
 |---|---|---|---|
 | GET | `/health` | inline | Service health check |
-| POST | `/agent` | `routes/agent.js` | Main agentic endpoint — full structured Nova response |
-| POST | `/analyze` | `app.js` (legacy) | Analyze text/image selection (companion app route) |
-| POST | `/suggest-actions` | `app.js` (legacy) | Ranked action suggestions |
-| POST | `/voice` | `routes/voice.js` | Buffered voice transcription via Nova 2 Lite |
-| POST | `/plan` | `routes/plan.js` | Browser action plan generation via Nova 2 Lite |
+| POST | `/agent` | `routes/agent.js` | Main agentic endpoint — full structured Gradient AI response |
+| POST | `/analyze` | `app.js` | Analyze text/image selection (companion app route) |
+| POST | `/suggest-actions` | `app.js` | Ranked action suggestions |
+| POST | `/voice` | `routes/voice.js` | Buffered voice transcription via Gradient AI |
+| POST | `/plan` | `routes/plan.js` | Browser action plan generation via Gradient AI |
 | POST | `/embed` | `routes/embed.js` | Embed and rank context items |
-| POST | `/transcribe` | `app.js` (legacy) | Audio transcription |
-| POST | `/plan-browser-action` | `app.js` (legacy) | Browser action planning (legacy) |
-| WS | `/live` | `services/novaVoice.js` | Nova 2 Sonic real-time bidirectional voice stream |
+| POST | `/transcribe` | `app.js` | Audio/text transcription |
+| POST | `/plan-browser-action` | `app.js` | Browser action planning (legacy compat) |
+| WS | `/live` | `services/gradientVoice.js` | Real-time voice WebSocket gateway |
 
-### 1.3 Amazon Nova Models Used
+### 1.3 DigitalOcean Gradient AI Models Used
 
-| Model ID | Role |
+| Model | Role |
 |---|---|
-| `amazon.nova-lite-v1:0` | Text + image reasoning, intent routing, action planning, response generation |
-| `amazon.nova-2-sonic-v1:0` | Real-time voice via Bedrock bidirectional streaming |
-| Nova Multimodal Embeddings | Context ranking and similarity (via `/embed` endpoint) |
+| `meta-llama/Meta-Llama-3.1-70B-Instruct` | Text reasoning, intent routing, action planning, response generation |
+| `meta-llama/Llama-3.2-11B-Vision-Instruct` | Multimodal image + text understanding |
+| `text-embedding-3-small` | Context ranking and semantic similarity |
+
+All models are served via DigitalOcean Gradient AI serverless inference — no GPU droplets required.
 
 ### 1.4 Startup Validation
 
-On boot, `startupCheck.js` sends a small test request to Bedrock and logs:
-- `[startup] Bedrock connection OK — Nova responded: "..."` on success
-- Clear diagnostic on failure: missing env vars / invalid credentials / wrong region / model access issue
+On boot, `startupCheck.js` sends a minimal test request to Gradient AI and logs:
+- `[startup] ✓ Gradient AI connection OK — model responded: "..."` on success
+- Clear diagnostics on failure: missing `MODEL_ACCESS_KEY`, invalid key, model not found, rate limit
 
 ---
 
@@ -79,7 +82,7 @@ On boot, `startupCheck.js` sends a small test request to Bedrock and logs:
 
 - Captures text selection via clipboard hook
 - Captures screen region via lasso screenshot tool
-- Sends payload to Nova Agent Backend (`/agent` or `/analyze`)
+- Sends payload to Gradient Agent Backend (`/agent` or `/analyze`)
 - Displays result in floating orb UI
 - Supports hold-to-talk voice input (sends audio to `/voice` or `/live`)
 - Supports "Take Action" mode — sends to `/plan` then forwards plan to browser layer
@@ -95,11 +98,11 @@ User selects text or screen region
         ↓
 Companion App captures selection + mode
         ↓
-POST /agent  →  Nova Agent Backend
+POST /agent  →  Gradient Agent Backend
         ↓
-novaAgent.inferIntent()  →  Bedrock Nova 2 Lite
+gradientAgent.inferIntent()  →  Gradient AI (Llama 3.1 70B)
         ↓
-novaAgent.analyzeSelection()  →  Bedrock Nova 2 Lite
+gradientAgent.analyzeSelection()  →  Gradient AI (Llama 3.1 70B or Vision)
         ↓
 Structured JSON response returned
         ↓
@@ -110,30 +113,28 @@ Companion App displays result in orb UI
 Browser Action Agent / Extension executes steps
 ```
 
-Backend runs Nova 2 Lite for the summarize, explain, translate, debug, and draft-reply actions.
-
 ### 3.2 Voice Flow
 
 ```
 User holds trigger button
         ↓
-Companion App captures audio
+Companion App captures audio / text command
         ↓
-POST /voice  →  novaVoice.transcribeOrProcessVoice()
+POST /voice  →  gradientVoice.transcribeOrProcessVoice()
         ↓
-Nova 2 Lite processes audio + selection context
+Gradient AI processes command + selection context
         ↓
 Result returned to companion app
 ```
 
-For real-time streaming: WebSocket `/live` → Nova 2 Sonic via Bedrock bidirectional stream.
+For real-time streaming: WebSocket `/live` → `gradientVoice.attachSonicGateway()`.
 
 ### 3.3 Browser Action Flow
 
 ```
-POST /plan  →  novaAgent.generateActionPlan()
+POST /plan  →  gradientAgent.generateActionPlan()
         ↓
-Nova 2 Lite returns structured step list
+Gradient AI returns structured step list
         ↓
 Browser Action Agent (Playwright) or Extension executes steps
         ↓
@@ -154,17 +155,18 @@ Windows Companion App (WPF / .NET 8)
   ├── smart / guided modes
   └── voice capture (hold-to-talk)
         |
-Nova Agent Backend (Node.js / AWS Bedrock)
+Gradient Agent Backend (Node.js)
   ├── POST /agent       main agentic endpoint
-  ├── POST /analyze     legacy companion route
+  ├── POST /analyze     companion app route
   ├── POST /voice       buffered voice transcription
   ├── POST /plan        browser action plan generation
-  ├── POST /embed       multimodal context ranking
-  └── WS   /live        Nova 2 Sonic real-time voice stream
+  ├── POST /embed       semantic context ranking
+  └── WS   /live        real-time voice WebSocket gateway
         |
-AWS Bedrock
-  ├── amazon.nova-lite-v1:0     (text + image reasoning)
-  └── amazon.nova-2-sonic-v1:0  (real-time voice)
+DigitalOcean Gradient AI (Serverless Inference)
+  ├── meta-llama/Meta-Llama-3.1-70B-Instruct  (text + intent routing)
+  ├── meta-llama/Llama-3.2-11B-Vision-Instruct (image + multimodal)
+  └── text-embedding-3-small                   (semantic embeddings)
         |
 Browser Execution Layer
   ├── Chromium extension (current logged-in tab)
@@ -184,7 +186,7 @@ All inter-component communication uses JSON over HTTP or WebSocket. Schemas are 
 
 Key message types:
 - `SelectionPayload` — text, image bytes, mode, source app
-- `NovaResponse` — intent, result, suggested_actions, browser_plan, latencyMs, model
+- `GradientResponse` — intent, result, suggested_actions, browser_plan, latencyMs, model
 - `BrowserPlan` — preferred_path, fallback_path, steps[]
 - `VoicePayload` — audio bytes, selection context
 
@@ -193,14 +195,14 @@ Key message types:
 ## 6. Project Structure
 
 ```
-cursivis-nova/
- backend/nova-agent/          # Node.js Nova backend (AWS Bedrock)
+cursivis-gradient/
+ backend/gradient-agent/          # Node.js Gradient AI backend
     src/
        services/
-          bedrockClient.js
-          novaAgent.js
-          novaVoice.js
-          novaEmbeddings.js
+          gradientClient.js       # OpenAI client → DO inference endpoint
+          gradientAgent.js        # inferIntent, analyzeSelection, generateActionPlan
+          gradientVoice.js        # voice transcription + WebSocket gateway
+          gradientEmbeddings.js   # embedText, embedImage, rankOrEmbedContext
        routes/
           agent.js
           voice.js
@@ -208,36 +210,36 @@ cursivis-nova/
           embed.js
        app.js
        server.js
+       gradientService.js         # factory functions for app.js
        startupCheck.js
     .env.example
     Dockerfile
     package.json
  desktop/
-    cursivis-companion/          # WPF companion app (.NET 8)
-    browser-action-agent/        # Playwright browser executor
-    browser-extension-chromium/  # Chromium extension (MV3)
-    browser-native-host/         # Native messaging bridge
- plugin/logitech-plugin/         # Logitech MX Creative Console (C#)
- shared/ipc-protocol/            # JSON schema contracts
+    cursivis-companion/           # WPF companion app (.NET 8)
+    browser-action-agent/         # Playwright browser executor
+    browser-extension-chromium/   # Chromium extension (MV3)
+    browser-native-host/          # Native messaging bridge
+ plugin/logitech-plugin/          # Logitech MX Creative Console (C#)
+ shared/ipc-protocol/             # JSON schema contracts
  docs/
-    DEPLOYMENT_AWS.md
+    DEPLOYMENT_DIGITALOCEAN.md
     HACKATHON_BUILD_POST.md
     DEMO_SCENARIOS.md
     ARCHITECTURE_DIAGRAM.svg
  scripts/
     run-demo.ps1
     smoke-test.ps1
-    deploy-aws.ps1
+    deploy-do.ps1
 ```
 
 ---
 
 ## 7. Security
 
-- AWS credentials are never hardcoded in source files
+- `MODEL_ACCESS_KEY` is never hardcoded in source files
 - All credentials are injected via environment variables at runtime
 - `.env` is gitignored — only `.env.example` is committed
-- `AWS_BEARER_TOKEN_BEDROCK` is available but not used for primary auth — standard IAM credential auth via AWS SDK v3 is used
 - No secrets appear in logs or API responses
 
 ---
@@ -246,86 +248,60 @@ cursivis-nova/
 
 | Variable | Default | Description |
 |---|---|---|
-| `AWS_ACCESS_KEY_ID` | — | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | — | AWS secret key |
-| `AWS_REGION` | `eu-north-1` | AWS region |
-| `BEDROCK_TEXT_MODEL_ID` | `amazon.nova-lite-v1:0` | Nova 2 Lite model ID |
-| `BEDROCK_VOICE_MODEL_ID` | `amazon.nova-2-sonic-v1:0` | Nova 2 Sonic model ID |
-| `BEDROCK_EMBEDDING_MODEL_ID` | — | Embedding model ID (optional) |
+| `MODEL_ACCESS_KEY` | — | DigitalOcean Gradient AI Model Access Key |
+| `GRADIENT_TEXT_MODEL` | `meta-llama/Meta-Llama-3.1-70B-Instruct` | Text model ID |
+| `GRADIENT_VISION_MODEL` | `meta-llama/Llama-3.2-11B-Vision-Instruct` | Vision model ID |
+| `GRADIENT_EMBED_MODEL` | `text-embedding-3-small` | Embedding model ID |
 | `PORT` | `8080` | Backend HTTP port |
 
 ---
 
 ## 9. Deployment
 
-The Nova Agent Backend is containerized via Docker and deployed to **AWS App Runner** via ECR.
+The Gradient Agent Backend is containerized via Docker and deployed to **DigitalOcean App Platform**.
 
 ```
-Docker build → ECR push → App Runner deploy
+Docker build → DO App Platform deploy (via .do/app.yaml)
 ```
 
-See `docs/DEPLOYMENT_AWS.md` and `scripts/deploy-aws.ps1` for full instructions.
+See `docs/DEPLOYMENT_DIGITALOCEAN.md` and `scripts/deploy-do.ps1` for full instructions.
 
 ---
 
-## 10. Development Phases
+## 10. Why DigitalOcean Gradient AI
 
-### Phase 1 — Core Nova Integration (complete)
-- AWS Bedrock SDK v3 setup
-- `bedrockClient.js` singleton with `eu-north-1` region
-- `novaAgent.js` — `inferIntent`, `analyzeSelection`, `generateActionPlan`
-- Startup validation via `startupCheck.js`
-- Live test confirmed: real Nova 2 Lite response, ~750ms latency
-
-### Phase 2 — Voice + Embeddings (complete)
-- `novaVoice.js` — buffered voice via `/voice`, real-time via `/live` WebSocket
-- `novaEmbeddings.js` — context ranking via `/embed`
-- Nova 2 Sonic gateway attached to HTTP server
-
-### Phase 3 — Browser Execution (complete)
-- `/plan` endpoint — Nova 2 Lite generates structured browser action plan
-- Browser Action Agent (Playwright) executes steps in managed Chromium
-- Chromium extension executes steps in user's live logged-in tab
-
-### Phase 4 — Polish + Submission
-- All Gemini/Google references removed from entire codebase
-- README and architecture docs fully updated for Amazon Nova
-- Smoke test and demo scripts updated for AWS credentials
-- Pushed to `CURSIVIS-1.0-AMAZON-NOVA` on GitHub
+- Single credential (`MODEL_ACCESS_KEY`) — no IAM roles, no region config, no SDK setup
+- OpenAI-compatible API — standard `openai` npm package, zero proprietary SDK
+- Serverless inference — no GPU droplets to manage, pay-per-token
+- Llama 3.1 70B — strong reasoning, fast, cost-effective for always-on trigger-driven UX
+- Llama 3.2 Vision — multimodal image understanding in the same API
+- Embeddings endpoint — semantic ranking for context-aware responses
+- App Platform — simple container deployment with `.do/app.yaml`
 
 ---
 
-## 11. Example Nova Response
+## 11. Example Gradient AI Response
 
 ```json
 {
-  "mode": "smart",
-  "intent": "summarize_text",
-  "reasoning_summary": "Nova 2 Lite performed \"summarize_text\" on the selection.",
-  "suggested_actions": ["translate_text", "explain", "bullet_points"],
-  "result": {
-    "type": "summary",
-    "content": "Amazon Nova is AWS's new frontier model family offering advanced intelligence and top price performance."
-  },
-  "browser_plan": {
-    "preferred_path": "current_tab",
-    "fallback_path": "managed_browser",
-    "steps": []
-  },
-  "latencyMs": 750,
-  "model": "amazon.nova-lite-v1:0",
-  "usage": { "inputTokens": 162, "outputTokens": 18 }
+  "protocolVersion": "1.0.0",
+  "action": "summarize",
+  "result": "DigitalOcean Gradient AI is a full-stack AI platform offering serverless inference, GPU compute, and seamless deployment for developers.",
+  "confidence": 0.91,
+  "alternatives": ["bullet_points", "explain", "translate"],
+  "latencyMs": 820,
+  "model": "meta-llama/Meta-Llama-3.1-70B-Instruct",
+  "provider": "DigitalOcean Gradient AI",
+  "usage": { "inputTokens": 148, "outputTokens": 22 }
 }
 ```
-
-Backend returns a real Nova-generated summary — not a mock, not a Gemini response.
 
 ---
 
 ## 12. References
 
-- [Amazon Nova Developer Guide](https://docs.aws.amazon.com/bedrock/latest/userguide/amazon-nova.html)
-- [Amazon Bedrock Runtime API](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InvokeModel.html)
-- [AWS Bedrock Node.js SDK](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/bedrock-runtime/)
-- [docs/DEPLOYMENT_AWS.md](docs/DEPLOYMENT_AWS.md)
+- [DigitalOcean Gradient AI Docs](https://docs.digitalocean.com/products/gradient-ai/)
+- [Serverless Inference](https://docs.digitalocean.com/products/gradient-ai/serverless-inference/)
+- [App Platform](https://docs.digitalocean.com/products/app-platform/)
+- [docs/DEPLOYMENT_DIGITALOCEAN.md](docs/DEPLOYMENT_DIGITALOCEAN.md)
 - [docs/HACKATHON_BUILD_POST.md](docs/HACKATHON_BUILD_POST.md)

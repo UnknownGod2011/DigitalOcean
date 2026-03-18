@@ -1,176 +1,220 @@
-﻿# Cursivis — Cursor-Native AI Agent powered by Amazon Nova
+﻿# Cursivis — Cursor-Native AI Agent
 
-> **Selection = Context · Trigger = Intent · Nova = Intelligence**
+> **Selection = Context · Trigger = Intent · Gradient AI = Intelligence**
 
-Built for the **Amazon Nova AI Hackathon** on AWS Bedrock.
+Built for the **DigitalOcean Gradient™ AI Hackathon**.
 
-Cursivis turns your cursor into an AI agent. Select text, an image, or a UI region — press a trigger — and Amazon Nova reasons about what you selected, returns the most useful result, and optionally executes it directly in your browser.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+Cursivis turns your cursor into an AI agent. Select text, an image, or a UI region — press a trigger — and DigitalOcean Gradient AI classifies the content, routes it to the right specialist action, and returns the most useful result. Optionally, it executes that result directly in your browser.
 
 ---
 
-## Amazon Nova Models
+## What Makes This Different
 
-| Model | Role |
+Most AI tools require you to open a chat window, explain context, paste content, wait, then manually apply the result. Cursivis eliminates all of that.
+
+The interaction is:
+
+1. **Select** — highlight text, lasso a screen region, or hold to talk
+2. **Trigger** — press a button (Logitech MX Creative Console or keyboard shortcut)
+3. **Review** — result appears in the orb UI and copies to clipboard
+4. **Act** — optionally press "Take Action" to execute in the browser
+
+The AI decision is visible in every response:
+```json
+{
+  "detectedType": "code",
+  "selectedAction": "debug_code",
+  "actionLabel": "Debug Code",
+  "routingConfidence": "high",
+  "routingReasoning": "Content classified as \"code\" → routed to \"debug_code\"."
+}
+```
+
+---
+
+## DigitalOcean Gradient AI Features Used
+
+| Feature | Implementation |
 |---|---|
-| Nova 2 Lite (`amazon.nova-lite-v1:0`) | Text + image reasoning, intent routing, action planning, response generation |
-| Nova 2 Sonic (`amazon.nova-2-sonic-v1:0`) | Real-time voice via Bedrock bidirectional streaming |
-| Nova Multimodal Embeddings | Context ranking and similarity (via `/embed` endpoint) |
+| Serverless Inference | All AI calls via `https://inference.do-ai.run/v1/` |
+| Claude 4.5 Haiku | Text reasoning, intent routing, action planning |
+| GPT-4o | Multimodal image + text understanding |
+| GTE Large v1.5 | Semantic embeddings and context ranking |
+| App Platform | Backend deployment via `.do/app.yaml` |
 
----
-
-## What Cursivis Does
-
-- **Select text** — Nova summarizes, rewrites, translates, explains, debugs, or drafts a reply
-- **Select an image / lasso a screen region** — Nova describes, extracts, or analyzes it
-- **Hold to talk** — Nova 2 Sonic transcribes your voice command and applies it to the selection
-- **Press Take Action** — Nova generates a browser action plan and executes it in your real logged-in tab
-
-All of this happens in under 3 seconds for typical inputs.
+Single credential: `MODEL_ACCESS_KEY` from the DigitalOcean Control Panel. No IAM roles, no region config, no proprietary SDK.
 
 ---
 
 ## Architecture
 
 ```
-Logitech MX Trigger / Mock Trigger
-        |
+Logitech MX Trigger / Keyboard Shortcut
+        │
 Windows Companion App (WPF / .NET 8)
-  - text selection capture
-  - lasso screenshot capture
-  - orb + result UI
-  - smart / guided modes
-  - voice capture (hold-to-talk)
-        |
-Nova Agent Backend (Node.js / AWS Bedrock)
-  - POST /agent       main agentic endpoint
-  - POST /analyze     legacy companion route
-  - POST /voice       buffered voice transcription
-  - POST /plan        browser action plan generation
-  - POST /embed       multimodal context ranking
-  - WS   /live        Nova 2 Sonic real-time voice stream
-        |
+  ├── text selection capture
+  ├── lasso screenshot capture
+  ├── orb + result UI
+  ├── smart / guided modes
+  └── voice capture (hold-to-talk)
+        │
+Gradient Agent Backend (Node.js)
+  ├── POST /agent       ← specialist action router + Gradient AI
+  ├── POST /analyze     ← legacy companion route
+  ├── POST /suggest-actions
+  ├── POST /voice       ← voice transcription
+  ├── POST /plan        ← browser action plan generation
+  ├── POST /embed       ← semantic context ranking
+  └── WS   /live        ← real-time voice WebSocket
+        │
+DigitalOcean Gradient AI (Serverless Inference)
+  ├── anthropic-claude-4.5-haiku   (text + routing)
+  ├── openai-gpt-4o                (vision + multimodal)
+  └── gte-large-v1.5               (embeddings)
+        │
 Browser Execution Layer
-  - Chromium extension (current logged-in tab)
-  - Local Playwright agent (managed browser fallback)
-        |
-Output
-  - Result panel + clipboard copy
-  - Optional insert / replace in active app
-  - Browser UI actions (fill, click, reply, autofill)
+  ├── Chromium extension (current logged-in tab)
+  └── Playwright agent (managed browser fallback)
 ```
 
 ---
 
-## Project Structure
-
-```
-cursivis-nova/
- backend/nova-agent/          # Node.js Nova backend (AWS Bedrock)
-    src/
-       services/            # Modular Nova service layer
-          bedrockClient.js     # Singleton Bedrock client
-          novaAgent.js         # inferIntent, analyzeSelection, generateActionPlan
-          novaVoice.js         # transcribeOrProcessVoice, attachSonicGateway
-          novaEmbeddings.js    # embedText, embedImage, rankOrEmbedContext
-       routes/              # Express route handlers
-          agent.js             # POST /agent
-          voice.js             # POST /voice
-          plan.js              # POST /plan
-          embed.js             # POST /embed
-       app.js               # Express app + legacy routes
-       server.js            # HTTP server + startup validation
-       startupCheck.js      # Bedrock connectivity check on boot
-    .env.example
-    Dockerfile
-    package.json
- desktop/
-    cursivis-companion/      # WPF companion app (.NET 8)
-    browser-action-agent/    # Playwright browser executor
-    browser-extension-chromium/  # Chromium extension
-    browser-native-host/     # Native messaging bridge
- plugin/logitech-plugin/      # Logitech MX Creative Console integration (C#)
- shared/ipc-protocol/         # JSON schema contracts
- docs/                        # Architecture, deployment, build post
- scripts/                     # run-demo.ps1, smoke-test.ps1, deploy-aws.ps1
-```
-
----
-
-## Quick Start
+## Running Instructions
 
 ### Prerequisites
 
-- Windows 10 or 11
-- Node.js 20+
-- .NET 8 SDK
-- AWS account with Bedrock access (Nova 2 Lite + Nova 2 Sonic enabled under Model Access)
+- **Node.js 20+** — [nodejs.org](https://nodejs.org)
+- **npm 10+** — included with Node.js
+- **DigitalOcean account** with Gradient AI Platform access
+- **MODEL_ACCESS_KEY** — see below
 
-### 1. Configure credentials
+### Step 1: Get Your MODEL_ACCESS_KEY
+
+1. Go to [https://cloud.digitalocean.com/agent-platform/serverless-inference](https://cloud.digitalocean.com/agent-platform/serverless-inference)
+2. Click the **Serverless Inference** tab
+3. Scroll to **Model Access Keys**
+4. Click **Create Access Key** (or copy an existing one)
+
+### Step 2: Configure the Backend
 
 ```bash
-cd backend/nova-agent
+cd backend/gradient-agent
 cp .env.example .env
-# Fill in AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
 ```
 
-### 2. Start the backend
+Open `.env` and set your key:
+
+```
+MODEL_ACCESS_KEY=your_key_here
+```
+
+### Step 3: Install Dependencies
 
 ```bash
-cd backend/nova-agent
+cd backend/gradient-agent
 npm install
-node src/server.js
 ```
 
-On startup you will see:
-```
-[startup] Validating AWS Bedrock connection...
-[startup]  Bedrock connection OK — Nova responded: "..."
-[nova-agent] Listening on http://127.0.0.1:8080
+### Step 4: Start the Backend
+
+```bash
+npm start
 ```
 
-### 3. Test it
+You should see:
 
+```
+[startup] Validating DigitalOcean Gradient AI Platform connection...
+[startup] Endpoint: https://inference.do-ai.run/v1/
+[startup] Model   : anthropic-claude-4.5-haiku
+[startup] Key     : ***xxxx
+[startup] ✓ Gradient AI connection OK — model responded: "ready"
+[gradient-agent] Listening on http://127.0.0.1:8080
+[gradient-agent] Health: http://127.0.0.1:8080/health
+```
+
+### Step 5: Test the Backend
+
+**Health check:**
+```bash
+curl http://localhost:8080/health
+```
+Expected: `{"ok":true,"service":"gradient-agent","ts":"..."}`
+
+**Agent endpoint (text analysis with routing metadata):**
 ```bash
 curl -X POST http://localhost:8080/agent \
   -H "Content-Type: application/json" \
-  -d "{\"text\":\"Amazon Nova is a new family of frontier models from AWS.\",\"mode\":\"smart\"}"
+  -d '{
+    "text": "def fibonacci(n):\n    return n if n <= 1 else fibonacci(n-1) + fibonacci(n-2)",
+    "mode": "smart"
+  }'
 ```
 
-### 4. Full demo stack
+Expected response includes:
+```json
+{
+  "detectedType": "code",
+  "selectedAction": "explain_code",
+  "actionLabel": "Explain Code",
+  "routingConfidence": "high",
+  "result": "...",
+  "model": "anthropic-claude-4.5-haiku"
+}
+```
+
+**Suggest actions (Guided Mode):**
+```bash
+curl -X POST http://localhost:8080/suggest-actions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "protocolVersion": "1.0.0",
+    "requestId": "test-1",
+    "mode": "guided",
+    "selection": { "kind": "text", "text": "Please find attached the Q3 financial report for your review." },
+    "context": { "activeApp": "outlook", "cursorX": 0, "cursorY": 0 },
+    "timestampUtc": "2026-01-01T00:00:00Z"
+  }'
+```
+
+**Semantic embeddings:**
+```bash
+curl -X POST http://localhost:8080/embed \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "machine learning deployment",
+    "items": ["Docker for ML models", "Chocolate cake recipe", "Kubernetes for inference", "Neural network training"]
+  }'
+```
+
+### Step 6: Run the Smoke Test
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-demo.ps1 `
-  -AwsAccessKeyId "<KEY>" `
-  -AwsSecretAccessKey "<SECRET>" `
-  -AwsRegion "eu-north-1"
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1 -ModelAccessKey "your_key_here"
 ```
 
-Starts: Nova backend, browser action agent, companion app.
-
-### 5. Smoke test
+### Step 7: Launch the Full Demo Stack (Windows)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1 `
-  -AwsAccessKeyId "<KEY>" `
-  -AwsSecretAccessKey "<SECRET>" `
-  -AwsRegion "eu-north-1"
+powershell -ExecutionPolicy Bypass -File .\scripts\run-demo.ps1 -ModelAccessKey "your_key_here"
 ```
+
+This starts: backend, browser action agent, extension bridge, and companion app.
 
 ---
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `AWS_ACCESS_KEY_ID` | — | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | — | AWS secret key |
-| `AWS_REGION` | `eu-north-1` | AWS region |
-| `BEDROCK_TEXT_MODEL_ID` | `amazon.nova-lite-v1:0` | Nova 2 Lite model ID |
-| `BEDROCK_VOICE_MODEL_ID` | `amazon.nova-2-sonic-v1:0` | Nova 2 Sonic model ID |
-| `BEDROCK_EMBEDDING_MODEL_ID` | — | Embedding model ID (optional) |
-| `PORT` | `8080` | Backend HTTP port |
-
-> If `eu-north-1` returns a model access error, use `AWS_REGION=us-east-1` and `BEDROCK_TEXT_MODEL_ID=us.amazon.nova-lite-v1:0`
+| Variable | Default | Required | Description |
+|---|---|---|---|
+| `MODEL_ACCESS_KEY` | — | **Yes** | DigitalOcean Gradient AI Model Access Key |
+| `GRADIENT_TEXT_MODEL` | `anthropic-claude-4.5-haiku` | No | Text reasoning model |
+| `GRADIENT_VISION_MODEL` | `openai-gpt-4o` | No | Vision / multimodal model |
+| `GRADIENT_EMBEDDING_MODEL` | `gte-large-v1.5` | No | Embedding model |
+| `GRADIENT_BASE_URL` | `https://inference.do-ai.run/v1/` | No | Gradient AI API base URL |
+| `PORT` | `8080` | No | Backend HTTP port |
 
 ---
 
@@ -179,54 +223,107 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1 `
 | Method | Path | Description |
 |---|---|---|
 | GET | `/health` | Service health check |
-| POST | `/agent` | Main agentic endpoint — full structured Nova response |
+| POST | `/agent` | Main agentic endpoint — routing metadata + Gradient AI result |
 | POST | `/analyze` | Analyze text/image selection (companion app route) |
-| POST | `/suggest-actions` | Get ranked action suggestions |
-| POST | `/voice` | Buffered voice transcription via Nova 2 Lite |
-| POST | `/plan` | Generate browser action plan via Nova 2 Lite |
-| POST | `/embed` | Embed and rank context items |
-| POST | `/transcribe` | Audio transcription (legacy) |
-| POST | `/plan-browser-action` | Browser action planning (legacy) |
-| WS | `/live` | Nova 2 Sonic real-time bidirectional voice stream |
+| POST | `/suggest-actions` | Get ranked action suggestions for Guided Mode |
+| POST | `/voice` | Voice command transcription |
+| POST | `/plan` | Generate browser action plan |
+| POST | `/embed` | Embed and rank context items by semantic similarity |
+| WS | `/live` | Real-time voice WebSocket gateway |
 
-### Example `/agent` response
+### `/agent` Response Schema
 
 ```json
 {
-  "mode": "smart",
-  "intent": "summarize_text",
-  "reasoning_summary": "Nova 2 Lite performed \"summarize_text\" on the selection.",
-  "suggested_actions": ["translate_text", "explain", "bullet_points"],
-  "result": {
-    "type": "summary",
-    "content": "Amazon Nova is AWS's new frontier model family offering advanced intelligence and top price performance."
-  },
-  "browser_plan": {
-    "preferred_path": "current_tab",
-    "fallback_path": "managed_browser",
-    "steps": []
-  },
-  "latencyMs": 750,
-  "model": "amazon.nova-lite-v1:0",
-  "usage": { "inputTokens": 162, "outputTokens": 18 }
+  "protocolVersion": "1.0.0",
+  "resultType": "summary|rewrite|answer|debug|explain|draft|translation|bullets|insights|description",
+  "action": "summarize",
+  "intent": "summarize",
+  "result": "AI-generated output text",
+  "alternatives": ["bullet_points", "explain", "translate"],
+  "detectedType": "report",
+  "selectedAction": "summarize",
+  "actionLabel": "Summarize",
+  "routingConfidence": "high",
+  "routingReasoning": "Content classified as \"report\" → routed to \"summarize\".",
+  "latencyMs": 820,
+  "model": "anthropic-claude-4.5-haiku",
+  "usage": { "inputTokens": 148, "outputTokens": 22 },
+  "provider": "DigitalOcean Gradient AI",
+  "timestampUtc": "2026-03-18T12:00:00.000Z"
 }
 ```
 
 ---
 
-## AWS Deployment
+## DigitalOcean App Platform Deployment
 
-See [docs/DEPLOYMENT_AWS.md](docs/DEPLOYMENT_AWS.md) for full instructions.
+```bash
+# Install doctl
+# https://docs.digitalocean.com/reference/doctl/how-to/install/
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\deploy-aws.ps1 `
-  -AwsAccountId "123456789012" `
-  -AwsAccessKeyId "<KEY>" `
-  -AwsSecretAccessKey "<SECRET>" `
-  -Region "eu-north-1"
+# Authenticate
+doctl auth init
+
+# Deploy
+doctl apps create --spec .do/app.yaml
 ```
 
-Deploys to AWS ECR + App Runner.
+After deployment, set `MODEL_ACCESS_KEY` as a secret in the App Platform dashboard:
+**App Settings → Environment Variables → Add Secret → MODEL_ACCESS_KEY**
+
+See [docs/DEPLOYMENT_DIGITALOCEAN.md](docs/DEPLOYMENT_DIGITALOCEAN.md) for full instructions.
+
+---
+
+## Project Structure
+
+```
+cursivis-gradient/
+├── backend/gradient-agent/          # Node.js Gradient AI backend
+│   ├── src/
+│   │   ├── core/
+│   │   │   └── actionRouter.js      # Specialist action router
+│   │   ├── services/
+│   │   │   ├── gradientClient.js    # OpenAI-compatible DO client
+│   │   │   ├── gradientAgent.js     # inferIntent, analyzeSelection, generateActionPlan
+│   │   │   ├── gradientVoice.js     # voice transcription + WebSocket gateway
+│   │   │   └── gradientEmbeddings.js # embedText, rankOrEmbedContext
+│   │   ├── routes/
+│   │   │   ├── agent.js             # POST /agent (with routing metadata)
+│   │   │   ├── voice.js             # POST /voice
+│   │   │   ├── plan.js              # POST /plan
+│   │   │   └── embed.js             # POST /embed
+│   │   ├── app.js                   # Express app + legacy routes
+│   │   ├── server.js                # HTTP server entry point
+│   │   ├── gradientService.js       # Factory functions for app.js
+│   │   ├── startupCheck.js          # Gradient AI connectivity check
+│   │   ├── contentClassifier.js     # Content type classification
+│   │   ├── browserActionPlanner.js  # Browser action plan builder
+│   │   └── schemas.js               # JSON schema validators
+│   ├── .env.example
+│   ├── Dockerfile
+│   └── package.json
+├── desktop/
+│   ├── cursivis-companion/          # WPF companion app (.NET 8)
+│   ├── browser-action-agent/        # Playwright browser executor
+│   ├── browser-extension-chromium/  # Chromium extension (MV3)
+│   └── browser-native-host/         # Native messaging bridge
+├── plugin/logitech-plugin/          # Logitech MX Creative Console (C#)
+├── shared/ipc-protocol/             # JSON schema contracts
+├── docs/
+│   ├── DEPLOYMENT_DIGITALOCEAN.md
+│   ├── HACKATHON_BUILD_POST.md
+│   ├── DEMO_SCENARIOS.md
+│   └── ARCHITECTURE_DIAGRAM.md
+├── scripts/
+│   ├── run-demo.ps1
+│   ├── smoke-test.ps1
+│   └── deploy-do.ps1
+├── .do/app.yaml                     # DigitalOcean App Platform spec
+├── ARCHITECTURE_PLAN.md
+└── LICENSE
+```
 
 ---
 
@@ -234,5 +331,12 @@ Deploys to AWS ECR + App Runner.
 
 - [ARCHITECTURE_PLAN.md](ARCHITECTURE_PLAN.md) — full system design
 - [docs/HACKATHON_BUILD_POST.md](docs/HACKATHON_BUILD_POST.md) — how it was built
-- [docs/DEPLOYMENT_AWS.md](docs/DEPLOYMENT_AWS.md) — AWS deployment guide
-- [docs/DEMO_SCENARIOS.md](docs/DEMO_SCENARIOS.md) — demo walkthrough scenarios
+- [docs/DEPLOYMENT_DIGITALOCEAN.md](docs/DEPLOYMENT_DIGITALOCEAN.md) — deployment guide
+- [docs/DEMO_SCENARIOS.md](docs/DEMO_SCENARIOS.md) — demo walkthrough with expected outputs
+- [docs/ARCHITECTURE_DIAGRAM.md](docs/ARCHITECTURE_DIAGRAM.md) — architecture diagram notes
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE)

@@ -1,10 +1,10 @@
 /**
  * routes/embed.js
- * POST /embed — embed and rank context items via Amazon Bedrock embeddings
+ * POST /embed — embed and rank context items via DigitalOcean Gradient AI embeddings
  */
 
 import { Router } from "express";
-import { rankOrEmbedContext, embedText, embedImage } from "../services/novaEmbeddings.js";
+import { rankOrEmbedContext, embedText, embedImage } from "../services/gradientEmbeddings.js";
 
 const router = Router();
 
@@ -34,7 +34,7 @@ router.post("/", async (req, res) => {
     return res.json({ ...result, timestampUtc: new Date().toISOString() });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    const status = /ThrottlingException|429|rate limit/i.test(msg) ? 429 : 500;
+    const status = /429|rate limit|quota/i.test(msg) ? 429 : 500;
     return res.status(status).json({ error: "Embedding failed.", details: msg });
   }
 });

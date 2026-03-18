@@ -1,10 +1,10 @@
 /**
  * routes/plan.js
- * POST /plan — generate a browser action plan via Nova 2 Lite
+ * POST /plan — generate a browser action plan via Gradient AI
  */
 
 import { Router } from "express";
-import { generateActionPlan } from "../services/novaAgent.js";
+import { generateActionPlan } from "../services/gradientAgent.js";
 
 const router = Router();
 
@@ -34,7 +34,7 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    const status = /ThrottlingException|429|rate limit/i.test(msg) ? 429 : 500;
+    const status = /429|rate limit|quota/i.test(msg) ? 429 : 500;
     return res.status(status).json({ error: "Action planning failed.", details: msg });
   }
 });

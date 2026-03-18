@@ -1,11 +1,11 @@
 /**
  * routes/voice.js
- * POST /voice — transcribe or process a voice input via Nova 2 Lite
+ * POST /voice — transcribe or process a voice input via Gradient AI
  * Real-time streaming is handled by the WebSocket gateway at /live
  */
 
 import { Router } from "express";
-import { transcribeOrProcessVoice } from "../services/novaVoice.js";
+import { transcribeOrProcessVoice } from "../services/gradientVoice.js";
 
 const router = Router();
 
@@ -31,7 +31,7 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    const status = /ThrottlingException|429|rate limit/i.test(msg) ? 429 : 500;
+    const status = /429|rate limit|quota/i.test(msg) ? 429 : 500;
     return res.status(status).json({ error: "Voice processing failed.", details: msg });
   }
 });

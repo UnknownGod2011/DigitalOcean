@@ -2,10 +2,12 @@ FROM node:20-bookworm-slim
 
 WORKDIR /app
 
-COPY backend/nova-agent/package*.json ./
+# Copy package files and install production dependencies
+COPY backend/gradient-agent/package*.json ./
 RUN npm ci --omit=dev
 
-COPY backend/nova-agent/src ./src
+# Copy source and shared schemas
+COPY backend/gradient-agent/src ./src
 COPY shared/ipc-protocol ./shared/ipc-protocol
 
 ENV NODE_ENV=production

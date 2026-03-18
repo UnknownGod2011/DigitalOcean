@@ -1,0 +1,63 @@
+# DigitalOcean App Platform Configuration
+# Deploy Cursivis Gradient AI Agent
+
+name: cursivis-gradient-agent
+
+services:
+  - name: gradient-agent
+    # Source configuration
+    github:
+      repo: your-username/cursivis-gradient
+      branch: main
+      deploy_on_push: true
+    
+    # Build configuration
+    source_dir: backend/gradient-agent
+    
+    # Runtime
+    environment_slug: node-js
+    
+    # Environment variables
+    envs:
+      - key: MODEL_ACCESS_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: GRADIENT_TEXT_MODEL
+        value: anthropic-claude-4.5-haiku
+        scope: RUN_TIME
+      - key: GRADIENT_VOICE_MODEL
+        value: openai-gpt-4o
+        scope: RUN_TIME
+      - key: PORT
+        value: "8080"
+        scope: RUN_TIME
+    
+    # Health check
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 10
+      period_seconds: 10
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 3
+    
+    # HTTP configuration
+    http_port: 8080
+    
+    # Instance configuration
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    
+    # Build command
+    build_command: npm install
+    
+    # Run command
+    run_command: node src/server.js
+
+# Region
+region: nyc
+
+# Alerts (optional)
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
