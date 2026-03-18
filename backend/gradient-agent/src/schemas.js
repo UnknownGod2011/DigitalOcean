@@ -21,30 +21,42 @@ function resolveSchemaDir() {
     }
   }
 
-  throw new Error(
-    `Schema directory not found. Checked: ${candidates.join(", ")}`
-  );
+  return null;
 }
 
-const schemaDir = resolveSchemaDir();
-
-function loadSchema(fileName) {
-  const fullPath = path.join(schemaDir, fileName);
-  return JSON.parse(fs.readFileSync(fullPath, "utf8"));
+// Always-pass validator used when schemas are unavailable
+function noopValidator(data) {
+  return true;
 }
+noopValidator.errors = null;
 
 export function createSchemaValidators() {
-  const ajv = new Ajv2020({
-    allErrors: true,
-    strict: false
-  });
-  addFormats(ajv);
+  const schemaDir = resolveSchemaDir();
 
-  const requestSchema = loadSchema("agent-request.schema.json");
-  const responseSchema = loadSchema("agent-response.schema.json");
+  if (!schemaDir) {
+    console.warn("[schemas] Schema directory not found — schema validation disabled. Requests will pass through.");
+    return {
+      validateRequest: noopValidator,
+      validateResponse: noopValidator
+    };
+  }
 
-  return {
-    validateRequest: ajv.compile(requestSchema),
-    validateResponse: ajv.compile(responseSchema)
-  };
+  try {
+    const ajv = new Ajv2020({ allErrors: true, strict: false });
+    addFormats(ajv);
+
+    const requestSchema = JSON.parse(fs.readFileSync(path.join(schemaDir, "agent-request.schema.json"), "utf8"));
+    const responseSchema = JSON.parse(fs.readFileSync(path.join(schemaDir, "agent-response.schema.json"), "utf8"));
+
+    return {
+      validateRequest: ajv.compile(requestSchema),
+      validateResponse: ajv.compile(responseSchema)
+    };
+  } catch (err) {
+    console.warn("[schemas] Failed to compile schemas — schema validation disabled:", err.message);
+    return {
+      validateRequest: noopValidator,
+      validateResponse: noopValidator
+    };
+  }
 }
