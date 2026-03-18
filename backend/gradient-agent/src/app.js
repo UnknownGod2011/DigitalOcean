@@ -238,6 +238,7 @@ export function createApp({ textGenerator, intentRouter, optionGenerator, browse
     res.json({
       ok: true,
       service: "gradient-agent",
+      version: "1.0.0",
       provider: "DigitalOcean Gradient AI",
       endpoint: process.env.GRADIENT_BASE_URL || "https://inference.do-ai.run/v1/",
       models: {
