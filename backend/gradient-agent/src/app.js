@@ -235,7 +235,19 @@ export function createApp({ textGenerator, intentRouter, optionGenerator, browse
   app.use("/embed", embedRouter);
 
   app.get("/health", (_req, res) => {
-    res.json({ ok: true, service: "gradient-agent", ts: new Date().toISOString() });
+    res.json({
+      ok: true,
+      service: "gradient-agent",
+      provider: "DigitalOcean Gradient AI",
+      endpoint: process.env.GRADIENT_BASE_URL || "https://inference.do-ai.run/v1/",
+      models: {
+        text: process.env.GRADIENT_TEXT_MODEL || "anthropic-claude-4.5-haiku",
+        vision: process.env.GRADIENT_VISION_MODEL || "openai-gpt-4o",
+        embedding: process.env.GRADIENT_EMBEDDING_MODEL || "gte-large-v1.5"
+      },
+      credentialsConfigured: Boolean(process.env.MODEL_ACCESS_KEY && process.env.MODEL_ACCESS_KEY.trim()),
+      ts: new Date().toISOString()
+    });
   });
 
   async function analyzeHandler(req, res) {

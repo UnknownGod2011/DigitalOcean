@@ -1,75 +1,75 @@
-# Cursivis Nova Agent
+# Cursivis Gradient Agent
 
-Amazon Nova-powered backend for Cursivis. Powered by:
+DigitalOcean Gradient AI-powered backend for Cursivis.
 
-- **Nova 2 Lite** — text/multimodal analysis via Bedrock Converse API
-- **Nova 2 Sonic** — real-time voice via Bedrock bidirectional streaming
-- **Nova Act** — UI automation (Python SDK, separate service)
+Powered by:
+- **anthropic-claude-4.5-haiku** — text reasoning, intent routing, action planning
+- **openai-gpt-4o** — multimodal image + text understanding
+- **gte-large-v1.5** — semantic embeddings and context ranking
+
+All inference via `https://inference.do-ai.run/v1/` — single credential, no IAM, no region config.
 
 ## Prerequisites
 
 - Node.js 20+
-- AWS account with Bedrock access
-- Nova 2 Lite and Nova 2 Sonic models enabled in your AWS region
+- DigitalOcean account with Gradient AI Platform access
+- `MODEL_ACCESS_KEY` from the DO Control Panel
 
-## AWS Credentials Setup
+## Get Your MODEL_ACCESS_KEY
 
-1. Go to [AWS IAM Console](https://console.aws.amazon.com/iam/)
-2. Create a user or role with the `AmazonBedrockFullAccess` policy (or a scoped policy allowing `bedrock:InvokeModel` and `bedrock:InvokeModelWithBidirectionalStream`)
-3. Generate an Access Key and Secret Access Key
-
-## Enable Nova Models in Bedrock
-
-1. Go to [Amazon Bedrock Console](https://console.aws.amazon.com/bedrock/) → Model access
-2. Request access to **Amazon Nova 2 Lite** and **Amazon Nova 2 Sonic**
-3. Wait for approval (usually instant)
-
-## Nova Act API Key
-
-1. Visit [https://nova.amazon.com/act](https://nova.amazon.com/act)
-2. Sign in with your AWS account
-3. Generate an API key from the dashboard
+1. Go to [https://cloud.digitalocean.com/agent-platform/serverless-inference](https://cloud.digitalocean.com/agent-platform/serverless-inference)
+2. Click the **Serverless Inference** tab
+3. Scroll to **Model Access Keys**
+4. Click **Create Access Key**
 
 ## Setup
 
 ```bash
 cp .env.example .env
-# Fill in your credentials in .env
+# Set MODEL_ACCESS_KEY=your_key_here in .env
 npm install
-node src/server.js
+npm start
+```
+
+Expected startup output:
+
+```
+[startup] Validating DigitalOcean Gradient AI Platform connection...
+[startup] Endpoint: https://inference.do-ai.run/v1/
+[startup] Model   : anthropic-claude-4.5-haiku
+[startup] Key     : ***xxxx
+[startup] ✓ Gradient AI connection OK — model responded: "ready"
+[gradient-agent] Listening on http://127.0.0.1:8080
 ```
 
 ## Environment Variables
 
-| Variable | Description |
-|---|---|
-| `AWS_ACCESS_KEY_ID` | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key |
-| `AWS_REGION` | AWS region (default: `eu-north-1`) |
-| `BEDROCK_TEXT_MODEL_ID` | Nova 2 Lite model ID (default: `amazon.nova-lite-v1:0`) |
-| `BEDROCK_VOICE_MODEL_ID` | Nova 2 Sonic model ID (default: `amazon.nova-2-sonic-v1:0`) |
-| `BEDROCK_EMBEDDING_MODEL_ID` | Embedding model ID (optional) |
-| `PORT` | HTTP port (default: `8080`) |
+| Variable | Default | Required | Description |
+|---|---|---|---|
+| `MODEL_ACCESS_KEY` | — | **Yes** | DigitalOcean Gradient AI Model Access Key |
+| `GRADIENT_TEXT_MODEL` | `anthropic-claude-4.5-haiku` | No | Text reasoning model |
+| `GRADIENT_VISION_MODEL` | `openai-gpt-4o` | No | Vision / multimodal model |
+| `GRADIENT_EMBEDDING_MODEL` | `gte-large-v1.5` | No | Embedding model |
+| `GRADIENT_BASE_URL` | `https://inference.do-ai.run/v1/` | No | Gradient AI API base URL |
+| `PORT` | `8080` | No | HTTP port |
 
 ## API Endpoints
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/health` | Health check |
-| POST | `/agent` | Main agentic endpoint — structured Nova response |
-| POST | `/analyze` | Analyze selected text/image (legacy, companion uses this) |
-| POST | `/suggest-actions` | Get action suggestions |
-| POST | `/voice` | Transcribe/process voice input |
+| GET | `/health` | Health check — shows configured models |
+| POST | `/agent` | Main agentic endpoint — routing metadata + Gradient AI result |
+| POST | `/analyze` | Analyze text/image selection (companion app route) |
+| POST | `/suggest-actions` | Get ranked action suggestions for Guided Mode |
+| POST | `/voice` | Voice command transcription |
 | POST | `/plan` | Generate browser action plan |
-| POST | `/embed` | Embed and rank context items |
-| POST | `/transcribe` | Transcribe audio (legacy) |
-| POST | `/plan-browser-action` | Plan browser automation steps (legacy) |
-| WS | `/live` | Nova 2 Sonic real-time voice stream |
+| POST | `/embed` | Embed and rank context items by semantic similarity |
+| WS | `/live` | Real-time voice WebSocket gateway |
 
 ## Docker
 
 ```bash
-# From the cursivis/ root
-docker build -f backend/nova-agent/Dockerfile -t cursivis-nova-agent .
-docker run -p 8080:8080 --env-file backend/nova-agent/.env cursivis-nova-agent
+# From the cursivis-gradient/ root
+docker build -f backend/gradient-agent/Dockerfile -t cursivis-gradient-agent .
+docker run -p 8080:8080 --env-file backend/gradient-agent/.env cursivis-gradient-agent
 ```
